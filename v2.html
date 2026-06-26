@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cuento Interactivo Pro</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', Roboto, sans-serif; background: #f4f1ea; padding: 40px 20px; color: #332c25; }
+        .container { max-width: 850px; margin: 0 auto; background: white; padding: 40px; border-radius: 30px; box-shadow: 0 20px 50px rgba(0,0,0,0.05); }
+        h1 { text-align: center; margin-bottom: 30px; font-weight: 400; }
+        
+        /* Contenedor del cuento */
+        .story-container { font-size: 1.6rem; line-height: 2.8rem; text-align: left; margin-bottom: 30px; padding: 20px; background: #faf8f5; border-radius: 16px; border: 1px solid #e6dfd5; }
+        
+        /* Estilos de las palabras dinámicas */
+        .word { display: inline-block; margin-right: 6px; color: #7d756d; transition: all 0.3s ease; }
+        .word.read { color: #1a1a1a; font-weight: 500; }
+        .word.fx-trigger { border-bottom: 2px dashed #c0392b; color: #a63426; }
+        .word.active-fx { background: #27ae60 !important; color: white !important; border-radius: 8px; padding: 0 6px; transform: scale(1.05); }
+
+        .controls { text-align: center; margin: 25px 0; }
+        button { background: #2c3e50; border: none; color: white; font-size: 1.2rem; padding: 15px 40px; border-radius: 50px; cursor: pointer; font-weight: 600; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        button.listening { background: #e74c3c; }
+        #transcript { background: #f8f9fa; padding: 15px; border-radius: 10px; min-height: 50px; text-align: center; font-style: italic; color: #555; border: 1px solid #eee; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>📖 Motor de Cuentos Dinámicos</h1>
+    
+    <div id="storyContainer" class="story-container"></div>
+
+    <div class="controls">
+        <button id="micBtn">🎤 Iniciar Lectura</button>
+    </div>
+
+    <div id="transcript">Logs de voz...</div>
+</div>
+
+<script>
+    (function() {
+        // 1. DATASET DEL CUENTO: Mucho más fácil de ampliar y mantener
+        const cuentoData = [
+            { w: "Había", fx: null }, { w: "una", fx: null }, { w: "vez", fx: null }, { w: "un", fx: null }, { w: "perrito", fx: null }, { w: "que", fx: null },
+            { w: "ladró", fx: "ladrido.mp3" }, // Tiene efecto
+            { w: "fuerte", fx: null }, { w: "al", fx: null }, { w: "ver", fx: null }, { w: "un", fx: null }, { w: "gato.", fx: null },
+            { w: "El", fx: null }, { w: "gato", fx: null }, { w: "asustado", fx: null },
+            { w: "maulló", fx: "maullido.mp3" }, // Tiene efecto
+            { w: "con", fx: null }, { w: "ganas", fx: null }, { w: "y", fx: null }, { w: "luego", fx: null },
+            { w: "huyó", fx: "huida.mp3" }, // Tiene efecto
+            { w: "corriendo", fx: null }, { w: "hacia", fx: null }, { w: "el", fx: null }, { w: "bosque.", fx: null }
+        ];
+
+        const storyContainer = document.getElementById('storyContainer');
+        const micBtn = document.getElementById('micBtn');
+        const transcriptDiv = document.getElementById('transcript');
+        
+        let currentIndex = 0; // Controla qué palabra esperamos que lea
+        let isListening = false;
+        let recognition = null;
+
+        // 2. RENDERIZADO DINÁMICO
+        function initStory() {
+            storyContainer.innerHTML = '';
+            cuentoData.forEach((item, index) => {
+                const span = document.createElement('span');
+                span.innerText = item.w;
+                span.id = `word-${index}`;
+                span.classList.add('word');
+                if (item.fx) span.classList.add('fx-trigger'); // Marca visual para testing
+                storyContainer.appendChild(span);
+            });
+        }
+
+        // Limpiar tildes y signos de puntuación para comparar strings limpios
+        function cleanWord(text) {
+            return text.normalize("NFD")
+                       .replace(/[\u0300-\u036f]/g, "")
+                       .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g,"")
+                       .toLowerCase().trim();
+        }
+
+        // 3. PROCESADOR DE AVANCE DE LECTURA
+        function processSpeech(speechText) {
+            const spokenWords = speechText.toLowerCase().split(' ');
+            
+            spokenWords.forEach(spoken => {
+                if (currentIndex >= cuentoData.length) return;
+
+                const targetWord = cleanWord(cuentoData[currentIndex].w);
+                const cleanSpoken = cleanWord(spoken);
+
+                // Si la palabra dicha coincide con la que sigue en el cuento
+                if (cleanSpoken === targetWord) {
+                    const el = document.getElementById(`word-${currentIndex}`);
+                    if (el) {
+                        el.classList.add('read'); // Queda marcada como leída
+                        
+                        // Si esta palabra específica tiene un sonido asociado
+                        if (cuentoData[currentIndex].fx) {
+                            triggerFX(cuentoData[currentIndex].fx, el);
+                        }
+                    }
+                    currentIndex++; // Avanzamos el puntero al próximo objetivo
+                }
+            });
+        }
+
+        function triggerFX(audioFile, element) {
+            const audio = new Audio(audioFile);
+            audio.play().catch(e => console.log("Error audio:", e));
+
+            element.classList.add('active-fx');
+            setTimeout(() => element.classList.remove('active-fx'), 1500);
+        }
+
+        // 4. CONFIGURACIÓN DEL RECONOCIMIENTO DE VOZ
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            transcriptDiv.innerText = "Soporte de voz no disponible.";
+            micBtn.disabled = true;
+            return;
+        }
+
+        recognition = new SpeechRecognition();
+        recognition.lang = 'es-ES';
+        recognition.continuous = true;
+        recognition.interimResults = true;
+
+        recognition.onresult = function(event) {
+            let interimTranscript = '';
+            let finalTranscript = '';
+
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                if (event.results[i].isFinal) {
+                    finalTranscript += event.results[i][0].transcript;
+                } else {
+                    interimTranscript += event.results[i][0].transcript;
+                }
+            }
+
+            const currentSpeech = finalTranscript || interimTranscript;
+            transcriptDiv.innerHTML = `Escuchado: <strong>${currentSpeech}</strong>`;
+            
+            if (currentSpeech) {
+                processSpeech(currentSpeech);
+            }
+        };
+
+        // Reinicio automático si se corta
+        recognition.onend = function() {
+            if (isListening) recognition.start();
+        };
+
+        // Botón de control
+        micBtn.addEventListener('click', () => {
+            if (isListening) {
+                isListening = false;
+                recognition.stop();
+                micBtn.textContent = '🎤 Iniciar Lectura';
+                micBtn.classList.remove('listening');
+            } else {
+                isListening = true;
+                recognition.start();
+                micBtn.textContent = '🛑 Detener';
+                micBtn.classList.add('listening');
+            }
+        });
+
+        // Inicializar
+        initStory();
+    })();
+</script>
+</body>
+</html>
