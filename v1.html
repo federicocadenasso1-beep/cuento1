@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cuento con Sonidos Reales</title>
+    <style>
+        /* (Mismo estilo que antes, lo dejo igual para no alargar) */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', Roboto, sans-serif; min-height: 100vh; display: flex; justify-content: center; align-items: center; background: #f0ebe5; padding: 20px; }
+        .container { background: white; max-width: 800px; width: 100%; padding: 40px 35px; border-radius: 40px; box-shadow: 0 25px 70px rgba(0,0,0,0.12); text-align: center; }
+        h1 { font-size: 2.2rem; font-weight: 400; color: #3d352b; margin-bottom: 6px; }
+        .sub { color: #7a6e60; margin-bottom: 25px; font-size: 1rem; }
+        .badge { display: inline-block; background: #efe8df; padding: 5px 16px; border-radius: 50px; font-size: 0.8rem; font-weight: 600; color: #4d4237; margin: 0 4px 12px 4px; }
+        .story { font-size: 1.55rem; line-height: 2.5rem; text-align: left; padding: 25px 20px; background: #fdfcfa; border-radius: 24px; border: 1px solid #e8e0d7; margin: 20px 0 25px 0; color: #2b241e; }
+        .trigger { font-weight: 900; color: #c0392b; background: #fce9e6; padding: 2px 10px; border-radius: 12px; transition: all 0.15s ease; border: 2px solid transparent; }
+        .trigger.active { background: #27ae60 !important; color: white !important; border-color: #1e8449; box-shadow: 0 0 0 4px rgba(46,204,113,0.3); transform: scale(1.02); }
+        .controls { margin: 15px 0 10px; }
+        button { background: #2c3e50; border: none; color: white; font-size: 1.25rem; padding: 16px 48px; border-radius: 80px; cursor: pointer; font-weight: 600; transition: 0.2s; box-shadow: 0 6px 18px rgba(44,62,80,0.25); }
+        button:hover { background: #1a2a38; transform: scale(1.02); }
+        button.listening { background: #e74c3c; animation: pulse 1.8s infinite; }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(231,76,60,0.4); } 70% { box-shadow: 0 0 0 18px rgba(231,76,60,0); } 100% { box-shadow: 0 0 0 0 rgba(231,76,60,0); } }
+        #status { font-size: 1rem; color: #5d6d7e; margin: 15px 0 8px; font-weight: 500; }
+        #transcript { background: #f2f4f6; padding: 14px 22px; border-radius: 60px; font-size: 1rem; color: #2c3e50; min-height: 52px; border: 1px solid #dce1e6; margin: 8px 0 12px; word-break: break-word; }
+        .note { font-size: 0.9rem; color: #8e7f6e; margin-top: 22px; padding-top: 18px; border-top: 2px dashed #e0d6cc; line-height: 1.6; }
+        .note strong { color: #a04028; background: #f5e7e2; padding: 2px 10px; border-radius: 20px; font-weight: 700; }
+        .footer { margin-top: 12px; font-size: 0.75rem; color: #b5a99b; }
+        @media (max-width: 600px) { .container { padding: 25px 18px; } .story { font-size: 1.2rem; line-height: 2rem; padding: 18px 12px; } button { font-size: 1rem; padding: 14px 30px; } }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>📖 Cuento con sonidos reales</h1>
+    <div class="sub"><span class="badge">🎧 Escucha tu voz</span> <span class="badge">🔊 Sonidos reales</span></div>
+
+    <div class="story">
+        Había una vez un perrito muy valiente. El perrito se asomó al jardín y 
+        <span id="word-ladro" class="trigger" data-sound="bark">ladró</span> 
+        con todas sus fuerzas. De repente, un gato callejero apareció en la cerca. 
+        El gato, sin inmutarse, 
+        <span id="word-maullo" class="trigger" data-sound="meow">maulló</span> 
+        suavemente y bajó de un salto. El perrito, tan asustado, 
+        <span id="word-huyo" class="trigger" data-sound="run">huyó</span> 
+        a esconderse detrás de su caseta. ¡Qué historia tan divertida!
+    </div>
+
+    <div class="controls">
+        <button id="micBtn">🎤 Empezar a leer</button>
+    </div>
+    <div id="status">⏸️ Pulsa el botón y lee en voz alta</div>
+    <div id="transcript">📝 Aquí verás lo que digas...</div>
+    <div class="note">
+        ⚡ Di en voz alta: <strong>"ladró"</strong> (ladrido), 
+        <strong>"maulló"</strong> (maúllo) o <strong>"huyó"</strong> (golpe de huida).
+        <br>📌 Las palabras se pondrán <strong style="background:#27ae60;color:white;padding:2px 10px;border-radius:12px;">verdes</strong> al activarse.
+        <br>🔊 Asegúrate de tener los archivos: <strong>ladrido.mp3, maullido.mp3, huida.mp3</strong> en la misma carpeta.
+    </div>
+    <div class="footer">✨ Sonidos reales · Funciona con Chrome / Edge</div>
+</div>
+
+<script>
+    (function() {
+        const micBtn = document.getElementById('micBtn');
+        const statusDiv = document.getElementById('status');
+        const transcriptDiv = document.getElementById('transcript');
+
+        // ---- Mapeo de palabras (sin tildes) a archivos de audio ----
+        const soundFiles = {
+            'ladro': 'ladrido.mp3',
+            'maullo': 'maullido.mp3',
+            'huyo': 'huida.mp3'
+        };
+
+        // Para el resaltado
+        const wordToId = {
+            'ladro': 'word-ladro',
+            'maullo': 'word-maullo',
+            'huyo': 'word-huyo'
+        };
+
+        // Cooldown
+        let cooldowns = { 'bark': 0, 'meow': 0, 'run': 0 };
+        const COOLDOWN_TIME = 2000;
+
+        // Creamos elementos <audio> ocultos para cada sonido
+        const audioElements = {};
+        for (const [key, file] of Object.entries(soundFiles)) {
+            const audio = new Audio(file);
+            audio.preload = 'auto';
+            // Si el archivo no existe, el navegador lo notificará en consola
+            audioElements[key] = audio;
+        }
+
+        // --- Función para reproducir sonido real ---
+        function playSound(wordKey) {
+            const audio = audioElements[wordKey];
+            if (!audio) {
+                console.warn('No hay audio para:', wordKey);
+                return;
+            }
+            // Reiniciar si ya estaba sonando
+            audio.currentTime = 0;
+            audio.play().catch(err => {
+                console.warn('Error al reproducir:', err);
+                // Si falla, mostramos un mensaje en el status
+                statusDiv.innerHTML = '⚠️ No se pudo reproducir el sonido. ¿Falta el archivo?';
+            });
+        }
+
+        // --- Activar palabra (sonido + resaltado) ---
+        function triggerWord(word) {
+            if (!soundFiles[word]) return;
+
+            const now = Date.now();
+            // Usamos la primera letra del sonido para cooldown (bark, meow, run)
+            const soundType = word === 'ladro' ? 'bark' : word === 'maullo' ? 'meow' : 'run';
+            if (now - cooldowns[soundType] < COOLDOWN_TIME) return;
+            cooldowns[soundType] = now;
+
+            // Reproducir sonido real
+            playSound(word);
+
+            // Resaltado
+            const spanId = wordToId[word];
+            if (spanId) {
+                const el = document.getElementById(spanId);
+                if (el) {
+                    el.classList.add('active');
+                    setTimeout(() => el.classList.remove('active'), 1200);
+                }
+            }
+        }
+
+        // --- Normalizar texto (quitar tildes) ---
+        function normalize(text) {
+            return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+        }
+
+        // --- Reconocimiento de voz (igual que antes) ---
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        let recognition = null;
+        let isListening = false;
+
+        if (!SpeechRecognition) {
+            statusDiv.innerHTML = '❌ Tu navegador no soporta reconocimiento de voz. Usa Chrome o Edge.';
+            micBtn.disabled = true;
+            return;
+        }
+
+        recognition = new SpeechRecognition();
+        recognition.lang = 'es-ES';
+        recognition.continuous = true;
+        recognition.interimResults = true;
+
+        recognition.onstart = function() {
+            isListening = true;
+            micBtn.textContent = '🔴 Detener lectura';
+            micBtn.classList.add('listening');
+            statusDiv.innerHTML = '🎤 Escuchando... Lee en voz alta';
+        };
+
+        recognition.onend = function() {
+            if (isListening) {
+                try { recognition.start(); } catch(e) {
+                    isListening = false;
+                    micBtn.textContent = '🎤 Empezar a leer';
+                    micBtn.classList.remove('listening');
+                    statusDiv.innerHTML = '⏸️ Detenido. Vuelve a pulsar.';
+                }
+            } else {
+                micBtn.textContent = '🎤 Empezar a leer';
+                micBtn.classList.remove('listening');
+                statusDiv.innerHTML = '⏸️ Detenido';
+            }
+        };
+
+        recognition.onerror = function(event) {
+            if (event.error === 'not-allowed') {
+                statusDiv.innerHTML = '❌ Permiso denegado al micrófono. Habilítalo.';
+                isListening = false;
+                micBtn.textContent = '🎤 Empezar a leer';
+                micBtn.classList.remove('listening');
+            } else if (event.error === 'no-speech') {
+                statusDiv.innerHTML = '🔇 No te escucho. Habla más alto.';
+            } else {
+                statusDiv.innerHTML = `⚠️ Error: ${event.error}. Reinicia.`;
+                if (isListening) { try { recognition.start(); } catch(e) {} }
+            }
+        };
+
+        recognition.onresult = function(event) {
+            let final = '', interim = '';
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                const t = event.results[i][0].transcript.toLowerCase().trim();
+                if (event.results[i].isFinal) final += t;
+                else interim += t;
+            }
+
+            if (final) transcriptDiv.innerHTML = `📝 <strong>Dijiste:</strong> "${final}"`;
+            else if (interim) transcriptDiv.innerHTML = `📝 <em>Escuchando...</em> "${interim}"`;
+
+            const fullText = final + ' ' + interim;
+            const normalized = normalize(fullText);
+            // Buscar palabras clave
+            for (const keyWord of Object.keys(soundFiles)) {
+                const regex = new RegExp(`\\b${keyWord}\\b`, 'i');
+                if (regex.test(normalized)) {
+                    triggerWord(keyWord);
+                }
+            }
+        };
+
+        // --- Botón ---
+        micBtn.addEventListener('click', function() {
+            if (!recognition) return;
+
+            if (isListening) {
+                isListening = false;
+                recognition.stop();
+                micBtn.textContent = '🎤 Empezar a leer';
+                micBtn.classList.remove('listening');
+                statusDiv.innerHTML = '⏸️ Detenido';
+                transcriptDiv.innerHTML = '📝 Aquí verás lo que digas...';
+            } else {
+                try {
+                    recognition.start();
+                } catch(e) {
+                    try { recognition.stop(); setTimeout(() => recognition.start(), 300); } catch(err) {
+                        statusDiv.innerHTML = '⚠️ Error al iniciar.';
+                    }
+                }
+            }
+        });
+
+        window.addEventListener('beforeunload', function() {
+            if (recognition && isListening) try { recognition.stop(); } catch(e) {}
+        });
+    })();
+</script>
+</body>
+</html>
